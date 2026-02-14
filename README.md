@@ -19,8 +19,6 @@ This project uses 20,000 particles to render volume-based techniques activated t
     * **Visuals:** A hollow sphere with cyan grid lines (equator + meridian rings) and an energy field shell.
     * **Trigger:** Hold **Monkey** seal for 5 seconds (charging effect begins at 2s).
 
-* **Domain Expansion: Malevolent Shrine**
-    * **Visuals:** A dark, ominous domain with a blood-red floor, towering pillars, and a curved roof.
 
 ## Hand Poses Reference
 
