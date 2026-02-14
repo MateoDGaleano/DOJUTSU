@@ -529,7 +529,7 @@
                     const w1 = results.multiHandLandmarks[0][0];
                     const w2 = results.multiHandLandmarks[1][0];
                     const wristDist = Math.hypot(w1.x - w2.x, w1.y - w2.y);
-                    if (wristDist < 0.12) {
+                    if (wristDist < 0.16) {
                         detectedSeal = 'Clap';
                     }
                 }
