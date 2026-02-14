@@ -171,6 +171,33 @@
         const particles = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.3, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
         scene.add(particles);
 
+        // --- Sound Effects ---
+        const sfxChidori = new Audio('sounds/Chidori.mp3');
+        const sfxFireball = new Audio('sounds/Fireball.mp3');
+        const sfxShikiFuujin = new Audio('sounds/ShikiFuujin.mp3');
+        const sfxRoom = new Audio('sounds/TrafalgarRoom.mp3');
+        let currentSfx = null;
+
+        function playSfx(audio) {
+            if (currentSfx && currentSfx !== audio) {
+                currentSfx.pause();
+                currentSfx.currentTime = 0;
+            }
+            if (audio && audio !== currentSfx) {
+                audio.currentTime = 0;
+                audio.play().catch(() => { });
+            }
+            currentSfx = audio;
+        }
+
+        function stopSfx() {
+            if (currentSfx) {
+                currentSfx.pause();
+                currentSfx.currentTime = 0;
+                currentSfx = null;
+            }
+        }
+
         // Technique Functions
 
         function getShrine(i) {
@@ -308,6 +335,112 @@
             return p;
         }
 
+        // --- Shinigami (Dead Demon Consuming Seal) ---
+        function getShinigami(i) {
+            const total = COUNT;
+
+            // Head: sphere at top with horns
+            if (i < total * 0.05) {
+                const headR = 5;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                // Horns (small percentage jut upward)
+                if (i < total * 0.015) {
+                    const side = (i % 2 === 0) ? 1 : -1;
+                    const hornH = Math.random() * 8;
+                    return { x: side * (3 + Math.random() * 2), y: 35 + hornH, z: (Math.random() - 0.5) * 2, r: 0.4, g: 0.3, b: 0.5, s: 1.5 };
+                }
+                return {
+                    x: headR * Math.sin(phi) * Math.cos(theta),
+                    y: 28 + headR * Math.sin(phi) * Math.sin(theta),
+                    z: headR * Math.cos(phi),
+                    r: 0.8, g: 0.7, b: 0.9, s: 2.0
+                };
+            }
+
+            // Body / Torso: vertical elongated cylinder
+            else if (i < total * 0.25) {
+                const bodyH = Math.random() * 30; // from y=0 to y=28
+                const bodyR = 3 + (bodyH / 30) * 2; // slightly wider at top
+                const angle = Math.random() * Math.PI * 2;
+                return {
+                    x: bodyR * Math.cos(angle) + (Math.random() - 0.5) * 2,
+                    y: bodyH,
+                    z: bodyR * Math.sin(angle) + (Math.random() - 0.5) * 2,
+                    r: 0.7, g: 0.6, b: 0.85, s: 1.5
+                };
+            }
+
+            // Arms: extended horizontally from shoulders (~y=22)
+            else if (i < total * 0.35) {
+                const side = (i % 2 === 0) ? 1 : -1;
+                const armLen = Math.random() * 25;
+                const armDroop = armLen * 0.05; // slight droop
+                return {
+                    x: side * (5 + armLen),
+                    y: 22 - armDroop + (Math.random() - 0.5) * 2,
+                    z: (Math.random() - 0.5) * 3,
+                    r: 0.7, g: 0.65, b: 0.9, s: 1.2
+                };
+            }
+
+            // Robes / Kimono: wide flowing shape below torso
+            else if (i < total * 0.65) {
+                const robeH = -Math.random() * 35; // hangs below y=0
+                const widthFactor = 1 + Math.abs(robeH) / 15;
+                const robeR = (8 + Math.random() * 8) * widthFactor;
+                const angle = Math.random() * Math.PI * 2;
+                // Wave effect for flowing cloth
+                const wave = Math.sin(Date.now() * 0.001 + angle * 3) * 2;
+                return {
+                    x: robeR * Math.cos(angle) + wave,
+                    y: robeH,
+                    z: robeR * Math.sin(angle) * 0.6 + (Math.random() - 0.5) * 3,
+                    r: 0.6, g: 0.5, b: 0.8, s: 1.0
+                };
+            }
+
+            // Hair: flowing strands from head downward
+            else if (i < total * 0.75) {
+                const strand = Math.random() * Math.PI * 2;
+                const hairLen = Math.random() * 20;
+                const spread = 3 + hairLen * 0.3;
+                return {
+                    x: spread * Math.cos(strand) + (Math.random() - 0.5) * 3,
+                    y: 28 - hairLen,
+                    z: spread * Math.sin(strand) * 0.5,
+                    r: 0.9, g: 0.85, b: 0.95, s: 1.0
+                };
+            }
+
+            // Prayer beads / orbs: floating orbs around the figure
+            else if (i < total * 0.85) {
+                const orbAngle = (i / (total * 0.1)) * Math.PI * 2;
+                const orbR = 30 + Math.sin(Date.now() * 0.002 + orbAngle) * 5;
+                const orbY = 10 + Math.sin(orbAngle * 2 + Date.now() * 0.001) * 15;
+                const clusterJitter = Math.random() * 3;
+                return {
+                    x: orbR * Math.cos(orbAngle) + (Math.random() - 0.5) * clusterJitter,
+                    y: orbY + (Math.random() - 0.5) * clusterJitter,
+                    z: orbR * Math.sin(orbAngle) * 0.4,
+                    r: 0.3, g: 0.9, b: 0.7, s: 2.5
+                };
+            }
+
+            // Ghostly aura: scattered dim particles
+            else {
+                const auraR = 40 + Math.random() * 30;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                return {
+                    x: auraR * Math.sin(phi) * Math.cos(theta),
+                    y: auraR * Math.sin(phi) * Math.sin(theta) * 0.8,
+                    z: auraR * Math.cos(phi) * 0.5,
+                    r: 0.2, g: 0.5, b: 0.4, s: 0.6
+                };
+            }
+        }
+
         // Hand Tracking & Seal Logic
         let currentTech = 'neutral';
         let shakeIntensity = 0;
@@ -320,6 +453,7 @@
         let monkeyHoldStart = 0;
         let isMonkeyHeld = false;
         let roomActive = false;
+        let roomSfxPlayed = false;
 
         // Rotation Control
         let targetRotation = { x: 0, y: 0 };
@@ -347,28 +481,38 @@
                 return dTip > dPip * 1.1;
             };
 
+            // Thumb extension: tip (4) farther from index MCP (5) than thumb IP (3)
+            const tExt = dist(lm[4], lm[5]) > dist(lm[3], lm[5]) * 1.22;
+
             const iExt = isExtended(8, 6);
             const mExt = isExtended(12, 10);
             const rExt = isExtended(16, 14);
             const pExt = isExtended(20, 18);
 
-            // Boolean Signature: [Index, Middle, Ring, Pinky]
-            // Ox (Ushi): Index + Pinky Extended (User requested swap) -> 1001
-            // Hare (U): All Curled (Fist) (User requested swap) -> 0000
-            // Monkey (Saru): All Extended -> 1111
-            // Tiger (Tora): Index + Middle -> 1100
-            // Snake (Mi): Index Only -> 1000
-            // Boar (I): Middle + Ring + Pinky -> 0111
-            // Horse (Uma): Index + Middle + Ring -> 1110
+            // --- New seals (THUMB REQUIRED) checked first ---
+            // Ram:    T=1, I=0, M=0, R=0, P=0 (thumb only)
+            // Rabbit: T=1, I=0, M=0, R=0, P=1 (thumb + pinky)
+            // Dog:    T=1, I=1, M=0, R=0, P=0 (thumb + index)
+            // Rat:    T=1, I=1, M=1, R=0, P=0 (thumb + index + middle)
+            // Bird:   T=1, I=0, M=1, R=1, P=0 (thumb + middle + ring)
+            if (tExt) {
+                if (!iExt && !mExt && !rExt && !pExt) return 'Ram';
+                if (!iExt && !mExt && !rExt && pExt) return 'Rabbit';
+                if (iExt && !mExt && !rExt && !pExt) return 'Dog';
+                if (iExt && mExt && !rExt && !pExt) return 'Rat';
+                if (!iExt && mExt && rExt && !pExt) return 'Bird';
+            }
 
-            // Exact match logic
-            if (iExt && !mExt && !rExt && pExt) return 'Ox';      // 1001
-            if (!iExt && !mExt && !rExt && !pExt) return 'Hare';    // 0000
-            if (iExt && mExt && rExt && pExt) return 'Monkey';      // 1111
-            if (iExt && mExt && !rExt && !pExt) return 'Tiger';     // 1100
-            if (iExt && !mExt && !rExt && !pExt) return 'Snake';    // 1000
-            if (!iExt && mExt && rExt && pExt) return 'Boar';       // 0111
-            if (iExt && mExt && rExt && !pExt) return 'Horse';      // 1110
+            // --- Existing seals (no thumb requirement) ---
+            // Ox: 1001 | Hare: 0000 | Monkey: 1111 | Tiger: 1100
+            // Snake: 1000 | Boar: 0111 | Horse: 1110
+            if (iExt && !mExt && !rExt && pExt) return 'Ox';
+            if (!iExt && !mExt && !rExt && !pExt) return 'Hare';
+            if (iExt && mExt && rExt && pExt) return 'Monkey';
+            if (iExt && mExt && !rExt && !pExt) return 'Tiger';
+            if (iExt && !mExt && !rExt && !pExt) return 'Snake';
+            if (!iExt && mExt && rExt && pExt) return 'Boar';
+            if (iExt && mExt && rExt && !pExt) return 'Horse';
 
             return null;
         }
@@ -380,13 +524,25 @@
             let primaryHandLm = null;
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                // Clap detection: two hands with wrists close together
+                if (results.multiHandLandmarks.length >= 2) {
+                    const w1 = results.multiHandLandmarks[0][0];
+                    const w2 = results.multiHandLandmarks[1][0];
+                    const wristDist = Math.hypot(w1.x - w2.x, w1.y - w2.y);
+                    if (wristDist < 0.12) {
+                        detectedSeal = 'Clap';
+                    }
+                }
+
                 // Prioritize the hand that is detected as a valid seal
                 for (const lm of results.multiHandLandmarks) {
                     drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, { color: glowColor, lineWidth: 5 });
                     drawLandmarks(canvasCtx, lm, { color: '#fff', lineWidth: 1, radius: 2 });
 
-                    const seal = detectHandSeal(lm);
-                    if (seal) detectedSeal = seal;
+                    if (!detectedSeal || detectedSeal !== 'Clap') {
+                        const seal = detectHandSeal(lm);
+                        if (seal) detectedSeal = seal;
+                    }
 
                     // Use first hand for rotation
                     if (!primaryHandLm) primaryHandLm = lm;
@@ -410,8 +566,7 @@
                 if (!isMonkeyHeld) {
                     monkeyHoldStart = Date.now();
                     isMonkeyHeld = true;
-                    // Dont reset roomActive yet, let it persist until new tech or release?
-                    // Spec says: Hold 5s -> Room. 
+                    roomSfxPlayed = false;
                 }
 
                 const holdDuration = Date.now() - monkeyHoldStart;
@@ -420,6 +575,11 @@
                         // Charging starts at 2s
                         detectedTech = 'charging_room';
                         window.roomProgress = (holdDuration - 2000) / 3000;
+                    }
+                    // Start Room sound at 4s (1 second before activation)
+                    if (holdDuration >= 4000 && !roomSfxPlayed) {
+                        playSfx(sfxRoom);
+                        roomSfxPlayed = true;
                     }
                 } else {
                     detectedTech = 'room';
@@ -475,6 +635,11 @@
                 detectedTech = 'fireball';
                 roomActive = false;
             }
+            // Shiki Fūjin: Snake -> Boar -> Ram -> Rabbit -> Dog -> Rat -> Bird -> Horse -> Snake -> Clap
+            else if (seqStr.includes('Snake,Boar,Ram,Rabbit,Dog,Rat,Bird,Horse,Snake,Clap')) {
+                detectedTech = 'shikifuujin';
+                roomActive = false;
+            }
 
             // Priority: Room Charging > Sequence Tech > Room Active > Neutral
             if (detectedTech === 'neutral' && roomActive) detectedTech = 'room';
@@ -490,12 +655,13 @@
             const nameEl = document.getElementById('technique-name');
             shakeIntensity = tech !== 'neutral' ? 0.4 : 0;
 
-            if (tech === 'shrine') { glowColor = '#ff0000'; nameEl.innerText = "Domain Expansion: Malevolent Shrine"; bloomPass.strength = 2.5; }
-            else if (tech === 'chidori') { glowColor = '#0088ff'; nameEl.innerText = "Lightning Blade: Chidori"; bloomPass.strength = 3.5; }
-            else if (tech === 'fireball') { glowColor = '#ff4500'; nameEl.innerText = "Fire Style: Fireball Jutsu"; bloomPass.strength = 3.0; }
+            if (tech === 'shrine') { glowColor = '#ff0000'; nameEl.innerText = "Domain Expansion: Malevolent Shrine"; bloomPass.strength = 2.5; stopSfx(); }
+            else if (tech === 'chidori') { glowColor = '#0088ff'; nameEl.innerText = "Lightning Blade: Chidori"; bloomPass.strength = 3.5; playSfx(sfxChidori); }
+            else if (tech === 'fireball') { glowColor = '#ff4500'; nameEl.innerText = "Fire Style: Fireball Jutsu"; bloomPass.strength = 3.0; playSfx(sfxFireball); }
+            else if (tech === 'shikifuujin') { glowColor = '#9b30ff'; nameEl.innerText = "Sealing Jutsu: Dead Demon Consuming Seal"; bloomPass.strength = 3.5; playSfx(sfxShikiFuujin); }
             else if (tech === 'charging_room') { glowColor = '#00eaff'; nameEl.innerText = "Preparing Room..."; bloomPass.strength = 1.0 + (window.roomProgress || 0); }
             else if (tech === 'room') { glowColor = '#00eaff'; nameEl.innerText = "OPE OPE NO MI: ROOM"; bloomPass.strength = 2.5; }
-            else { glowColor = '#00ffff'; nameEl.innerText = "Neutral State"; bloomPass.strength = 1.0; }
+            else { glowColor = '#00ffff'; nameEl.innerText = "Neutral State"; bloomPass.strength = 1.0; stopSfx(); }
 
             for (let i = 0; i < COUNT; i++) {
                 let p;
@@ -508,6 +674,7 @@
                 else if (tech === 'shrine') p = getShrine(i);
                 else if (tech === 'chidori') p = getChidori(i);
                 else if (tech === 'fireball') p = getFireball(i);
+                else if (tech === 'shikifuujin') p = getShinigami(i);
                 else if (tech === 'charging_room') p = getRoomCharging(i, window.roomProgress || 0);
                 else if (tech === 'room') p = getRoom(i);
 
@@ -569,6 +736,8 @@
                 particles.rotation.z += 0.5;
             } else if (currentTech === 'fireball') {
                 particles.rotation.z = 0;
+            } else if (currentTech === 'shikifuujin') {
+                particles.rotation.z += 0.003; // Slow menacing drift
             } else {
                 // Neutral
             }
