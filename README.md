@@ -1,7 +1,7 @@
 ## Description
 DOJUTSU is a Naruto technique visualizer. It combines the MediaPipe hand tracking library with Three.js to recreate iconic techniques using particle effects — triggered by real hand seals performed in front of your webcam.
 
-![Demo GIF](https://github.com/user-attachments/assets/8ad2b871-02c0-4b97-95f3-34682e745be0)
+![Demo GIF](https://i.pinimg.com/originals/6d/b8/a0/6db8a0764316a6eed50aed8ff17ece2f.gif)
 
 ## Features
 
