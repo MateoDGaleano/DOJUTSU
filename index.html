@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>DOJUTSU</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Courier New', sans-serif;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10%;
+            width: 100%;
+            text-align: center;
+            color: #fff;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin: 0;
+            letter-spacing: 10px;
+            font-weight: 900;
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            background: linear-gradient(to bottom, #fff, #888);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        #technique-name {
+            font-size: 1.2rem;
+            color: #00ffff;
+            margin-top: 15px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        #current-seal {
+            font-size: 2rem;
+            color: #ff0055;
+            margin-top: 10px;
+            font-weight: bold;
+            text-shadow: 0 0 15px rgba(255, 0, 85, 0.8);
+            min-height: 40px;
+        }
+
+        #sequence-display {
+            font-size: 1rem;
+            color: #aaaaaa;
+            margin-top: 5px;
+            letter-spacing: 2px;
+        }
+
+        /* Large Centered Camera Hub - Taller for Reel Context */
+        #video-container {
+            position: absolute;
+            bottom: 2%;
+            left: 18%;
+            transform: translateX(-50%) scaleX(-1);
+            width: 85vw;
+            max-width: 450px;
+            height: 42vh;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            z-index: 20;
+            background-color: #000;
+            border-radius: 25px;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.8;
+        }
+
+        #output_canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        #grain {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
+        }
+    </style>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+        crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+    <div id="grain"></div>
+
+    <div id="ui">
+        <h1>DOJUTSU</h1>
+        <div id="technique-name">CHAKRA</div>
+        <div id="current-seal"></div>
+        <div id="sequence-display">Waiting for input...</div>
+    </div>
+
+    <div id="video-container">
+        <video class="input_video"></video>
+        <canvas id="output_canvas"></canvas>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // --- Scene & Rendering ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 55;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.body.appendChild(renderer.domElement);
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(new RenderPass(scene, camera));
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+        composer.addPass(bloomPass);
+
+        const COUNT = 20000;
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(COUNT * 3);
+        const colors = new Float32Array(COUNT * 3);
+        const sizes = new Float32Array(COUNT);
+
+        const targetPositions = new Float32Array(COUNT * 3);
+        const targetColors = new Float32Array(COUNT * 3);
+        const targetSizes = new Float32Array(COUNT);
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+        const particles = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.3, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
+        scene.add(particles);
+
+        // Technique Functions 
+        function getRed(i) {
+            if (i < COUNT * 0.1) {
+                const r = Math.random() * 9;
+                const theta = Math.random() * 6.28; const phi = Math.acos(2 * Math.random() - 1);
+                return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi), r: 3, g: 0.1, b: 0.1, s: 2.5 };
+            } else {
+                const armCount = 3; const t = (i / COUNT);
+                const angle = t * 15 + ((i % armCount) * (Math.PI * 2 / armCount));
+                const radius = 2 + (t * 40);
+                return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: (Math.random() - 0.5) * (10 * t), r: 0.8, g: 0, b: 0, s: 1.0 };
+            }
+        }
+
+        function getVoid(i) {
+            if (i < COUNT * 0.15) {
+                const angle = Math.random() * Math.PI * 2;
+                return { x: 26 * Math.cos(angle), y: 26 * Math.sin(angle), z: (Math.random() - 0.5) * 1, r: 1, g: 1, b: 1, s: 2.5 };
+            } else {
+                const radius = 30 + Math.random() * 90;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                return { x: radius * Math.sin(phi) * Math.cos(theta), y: radius * Math.sin(phi) * Math.sin(theta), z: radius * Math.cos(phi), r: 0.1, g: 0.6, b: 1.0, s: 0.7 };
+            }
+        }
+
+        function getPurple(i) {
+            if (Math.random() > 0.8) return { x: (Math.random() - 0.5) * 100, y: (Math.random() - 0.5) * 100, z: (Math.random() - 0.5) * 100, r: 0.5, g: 0.5, b: 0.7, s: 0.8 };
+            const r = 20; const theta = Math.random() * Math.PI * 2; const phi = Math.acos(2 * Math.random() - 1);
+            return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi), r: 0.6, g: 0.5, b: 1.0, s: 2.5 };
+        }
+
+        function getShrine(i) {
+            const total = COUNT;
+            if (i < total * 0.3) return { x: (Math.random() - 0.5) * 80, y: -15, z: (Math.random() - 0.5) * 80, r: 0.4, g: 0, b: 0, s: 0.8 };
+            else if (i < total * 0.4) {
+                const px = ((i % 4) < 2 ? 1 : -1) * 12; const pz = ((i % 4) % 2 == 0 ? 1 : -1) * 8;
+                return { x: px + (Math.random() - 0.5) * 2, y: -15 + Math.random() * 30, z: pz + (Math.random() - 0.5) * 2, r: 0.2, g: 0.2, b: 0.2, s: 0.6 };
+            } else if (i < total * 0.6) {
+                const t = Math.random() * Math.PI * 2; const rad = Math.random() * 30;
+                const curve = Math.pow(rad / 30, 2) * 10;
+                return { x: rad * Math.cos(t), y: 15 - curve + (Math.random() * 2), z: rad * Math.sin(t) * 0.6, r: 0.6, g: 0, b: 0, s: 0.6 };
+            } else return { x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 };
+        }
+
+        function getChidori(i) {
+            // Chaotic Lightning Ball - LARGER & MORE BOLTS
+
+            // Core (Dense Center)
+            if (i < COUNT * 0.2) {
+                const r = Math.random() * 8; // Larger core
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi), r: 0.8, g: 1.0, b: 1.0, s: 2.5 };
+            }
+            // Lightning Bolts (Jagged Lines)
+            else {
+                const step = i % 50;
+                const t = step / 50;
+
+                const spread = 45 * t; // Much larger spread
+                return {
+                    x: (Math.random() - 0.5) * spread * 2,
+                    y: (Math.random() - 0.5) * spread * 2,
+                    z: (Math.random() - 0.5) * spread * 2,
+                    r: 0.2, g: 0.9, b: 1.0, s: 1.2
+                };
+            }
+        }
+
+        function getFireball(i) {
+            // FIREBALL LAUNCH - Dispersing forward/outward
+
+            if (i < COUNT * 0.1) {
+                // Dense heavy center
+                const r = Math.random() * 10;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                return {
+                    x: r * Math.sin(phi) * Math.cos(theta),
+                    y: r * Math.sin(phi) * Math.sin(theta),
+                    z: r * Math.cos(phi) + 10,
+                    r: 1.0, g: 0.8, b: 0.0, s: 3.0
+                };
+            } else {
+                // Dispersing Cone / Explosion
+                // Simulate particles flying AT the screen or filling it
+                const spread = 80 + (Math.random() * 60); // Wide coverage
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * spread;
+
+                return {
+                    x: radius * Math.cos(angle),
+                    y: (Math.random() - 0.5) * spread,
+                    z: 20 + (Math.random() * 50),
+                    r: 1.0, g: Math.random() * 0.5, b: 0.0, s: 1.5 + Math.random()
+                };
+            }
+        }
+
+        // --- Room Visuals ---
+        function getRoomCharging(i, progress) {
+            // Swirling particles gathering energy
+            const maxR = 40;
+            const currentR = maxR * (1 - progress * 0.5); // Shrinks slightly to concentrate
+
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+
+            // Spiral effect
+            const spin = Date.now() * 0.005 * (1 + progress * 2);
+
+            return {
+                x: currentR * Math.sin(phi) * Math.cos(theta + spin),
+                y: currentR * Math.sin(phi) * Math.sin(theta + spin),
+                z: currentR * Math.cos(phi),
+                r: 0.0, g: 0.5 * progress, b: 1.0, s: 0.5 + progress
+            };
+        }
+
+        function getRoom(i) {
+            // Perfect Hollow Sphere (Blue shell) with Grid Structure
+            const r = 60;
+
+            // Grid Lines logic
+            // 1. Equator
+            // 2. Meridians
+            const structure = Math.random();
+
+            let p = {};
+
+            if (structure < 0.1) {
+                // Equator Ring
+                const theta = Math.random() * Math.PI * 2;
+                p = {
+                    x: r * Math.cos(theta),
+                    y: r * Math.sin(theta),
+                    z: 0,
+                    r: 0.0, g: 1.0, b: 1.0, s: 2.0 // Bright Cyan Line
+                };
+            } else if (structure < 0.2) {
+                // Meridian Ring (Vertical)
+                const phi = Math.random() * Math.PI * 2;
+                p = {
+                    x: r * Math.cos(phi),
+                    y: 0,
+                    z: r * Math.sin(phi),
+                    r: 0.0, g: 1.0, b: 1.0, s: 2.0
+                };
+            } else {
+                // General Shell
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+
+                // Jitter for energy field effect
+                const jitter = 1 + (Math.random() - 0.5) * 0.1;
+
+                p = {
+                    x: r * jitter * Math.sin(phi) * Math.cos(theta),
+                    y: r * jitter * Math.sin(phi) * Math.sin(theta),
+                    z: r * jitter * Math.cos(phi),
+                    r: 0.0, g: 0.9, b: 1.0, s: 1.5
+                };
+            }
+            return p;
+        }
+
+        // Hand Tracking & Seal Logic
+        let currentTech = 'neutral';
+        let shakeIntensity = 0;
+        const videoElement = document.querySelector('.input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        let glowColor = '#00ffff';
+
+        // Room State
+        let monkeyHoldStart = 0;
+        let isMonkeyHeld = false;
+        let roomActive = false;
+
+        // Rotation Control
+        let targetRotation = { x: 0, y: 0 };
+        let smoothedRotation = { x: 0, y: 0 };
+
+        // Seal Sequence State
+        let sequenceBuffer = [];
+        let lastSealTime = 0;
+        const SEQUENCE_TIMEOUT = 3000; // 3 seconds to chain seals
+
+        const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7 });
+
+        function detectHandSeal(lm) {
+            // Helper: distance between two points
+            const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+            // Wrist is lm[0]
+            const wrist = lm[0];
+
+            // Finger extension check
+            const isExtended = (tipIdx, pipIdx) => {
+                const dTip = dist(lm[tipIdx], wrist);
+                const dPip = dist(lm[pipIdx], wrist);
+                return dTip > dPip * 1.1;
+            };
+
+            const iExt = isExtended(8, 6);
+            const mExt = isExtended(12, 10);
+            const rExt = isExtended(16, 14);
+            const pExt = isExtended(20, 18);
+
+            // Boolean Signature: [Index, Middle, Ring, Pinky]
+            // Ox (Ushi): Index + Pinky Extended (User requested swap) -> 1001
+            // Hare (U): All Curled (Fist) (User requested swap) -> 0000
+            // Monkey (Saru): All Extended -> 1111
+            // Tiger (Tora): Index + Middle -> 1100
+            // Snake (Mi): Index Only -> 1000
+            // Boar (I): Middle + Ring + Pinky -> 0111
+            // Horse (Uma): Index + Middle + Ring -> 1110
+
+            // Exact match logic
+            if (iExt && !mExt && !rExt && pExt) return 'Ox';      // 1001
+            if (!iExt && !mExt && !rExt && !pExt) return 'Hare';    // 0000
+            if (iExt && mExt && rExt && pExt) return 'Monkey';      // 1111
+            if (iExt && mExt && !rExt && !pExt) return 'Tiger';     // 1100
+            if (iExt && !mExt && !rExt && !pExt) return 'Snake';    // 1000
+            if (!iExt && mExt && rExt && pExt) return 'Boar';       // 0111
+            if (iExt && mExt && rExt && !pExt) return 'Horse';      // 1110
+
+            return null;
+        }
+
+        hands.onResults((results) => {
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            let detectedTech = 'neutral';
+            let detectedSeal = null;
+            let primaryHandLm = null;
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                // Prioritize the hand that is detected as a valid seal
+                for (const lm of results.multiHandLandmarks) {
+                    drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, { color: glowColor, lineWidth: 5 });
+                    drawLandmarks(canvasCtx, lm, { color: '#fff', lineWidth: 1, radius: 2 });
+
+                    const seal = detectHandSeal(lm);
+                    if (seal) detectedSeal = seal;
+
+                    // Use first hand for rotation
+                    if (!primaryHandLm) primaryHandLm = lm;
+                }
+            }
+
+            // Update Target Rotation based on Primary Hand
+            if (primaryHandLm) {
+                // MediaPipe Coords: 0,0 top-left, 1,1 bottom-right.
+                // Map x (0..1) to Rotation Y (-1..1) 
+                // Map y (0..1) to Rotation X (-0.5..0.5)
+                const SENSITIVITY_X = 2.0;
+                const SENSITIVITY_Y = 1.0;
+
+                targetRotation.y = -(primaryHandLm[0].x - 0.5) * SENSITIVITY_X;
+                targetRotation.x = (primaryHandLm[0].y - 0.5) * SENSITIVITY_Y;
+            }
+
+            // Room Logic (Monkey Hold)
+            if (detectedSeal === 'Monkey') {
+                if (!isMonkeyHeld) {
+                    monkeyHoldStart = Date.now();
+                    isMonkeyHeld = true;
+                    // Dont reset roomActive yet, let it persist until new tech or release?
+                    // Spec says: Hold 5s -> Room. 
+                }
+
+                const holdDuration = Date.now() - monkeyHoldStart;
+                if (holdDuration < 5000) {
+                    if (holdDuration > 2000) {
+                        // Charging starts at 2s
+                        detectedTech = 'charging_room';
+                        window.roomProgress = (holdDuration - 2000) / 3000;
+                    }
+                } else {
+                    detectedTech = 'room';
+                    roomActive = true;
+                }
+            } else {
+                isMonkeyHeld = false;
+                if (roomActive) {
+                    detectedTech = 'room';
+                }
+            }
+
+            // Update Seal State
+            const now = Date.now();
+            const currentSealEl = document.getElementById('current-seal');
+            const sequenceEl = document.getElementById('sequence-display');
+
+            if (detectedSeal) {
+                currentSealEl.innerText = detectedSeal;
+                currentSealEl.style.opacity = 1;
+
+                // Add to sequence
+                if (sequenceBuffer.length === 0 || sequenceBuffer[sequenceBuffer.length - 1] !== detectedSeal) {
+                    if (now - lastSealTime > 500) {
+                        sequenceBuffer.push(detectedSeal);
+                        lastSealTime = now;
+                        sequenceEl.innerText = sequenceBuffer.join(" -> ");
+
+                        // Break room if new sequence starts
+                        if (detectedSeal !== 'Monkey') roomActive = false;
+                    }
+                } else {
+                    lastSealTime = now;
+                }
+            } else {
+                currentSealEl.style.opacity = 0.5;
+                if (now - lastSealTime > SEQUENCE_TIMEOUT) {
+                    sequenceBuffer = [];
+                    sequenceEl.innerText = "Waiting for input...";
+                }
+            }
+
+            // Check Sequences
+            const seqStr = sequenceBuffer.join(',');
+
+            // Chidori: Ox -> Hare -> Monkey
+            if (seqStr.includes('Ox,Hare,Monkey')) {
+                detectedTech = 'chidori';
+                roomActive = false;
+            }
+            // Fireball: Snake -> Tiger -> Monkey -> Boar -> Horse
+            else if (seqStr.includes('Snake,Tiger,Monkey,Boar,Horse')) {
+                detectedTech = 'fireball';
+                roomActive = false;
+            }
+
+            // Priority: Room Charging > Sequence Tech > Room Active > Neutral
+            if (detectedTech === 'neutral' && roomActive) detectedTech = 'room';
+
+            updateState(detectedTech);
+        });
+
+        function updateState(tech) {
+            // always update if charging to animate progress
+            if (currentTech === tech && tech !== 'charging_room') return;
+
+            currentTech = tech;
+            const nameEl = document.getElementById('technique-name');
+            shakeIntensity = tech !== 'neutral' ? 0.4 : 0;
+
+            if (tech === 'shrine') { glowColor = '#ff0000'; nameEl.innerText = "Domain Expansion: Malevolent Shrine"; bloomPass.strength = 2.5; }
+            else if (tech === 'purple') { glowColor = '#bb00ff'; nameEl.innerText = "Secret Technique: Hollow Purple"; bloomPass.strength = 4.0; }
+            else if (tech === 'void') { glowColor = '#00ffff'; nameEl.innerText = "Domain Expansion: Infinite Void"; bloomPass.strength = 2.0; }
+            else if (tech === 'red') { glowColor = '#ff3333'; nameEl.innerText = "Reverse Cursed Technique: Red"; bloomPass.strength = 2.5; }
+            else if (tech === 'chidori') { glowColor = '#0088ff'; nameEl.innerText = "Lightning Blade: Chidori"; bloomPass.strength = 3.5; }
+            else if (tech === 'fireball') { glowColor = '#ff4500'; nameEl.innerText = "Fire Style: Fireball Jutsu"; bloomPass.strength = 3.0; }
+            else if (tech === 'charging_room') { glowColor = '#00eaff'; nameEl.innerText = "Preparing Room..."; bloomPass.strength = 1.0 + (window.roomProgress || 0); }
+            else if (tech === 'room') { glowColor = '#00eaff'; nameEl.innerText = "OPE OPE NO MI: ROOM"; bloomPass.strength = 2.5; }
+            else { glowColor = '#00ffff'; nameEl.innerText = "Neutral State"; bloomPass.strength = 1.0; }
+
+            for (let i = 0; i < COUNT; i++) {
+                let p;
+                if (tech === 'neutral') {
+                    if (i < COUNT * 0.05) {
+                        const r = 15 + Math.random() * 20; const t = Math.random() * 6.28; const ph = Math.random() * 3.14;
+                        p = { x: r * Math.sin(ph) * Math.cos(t), y: r * Math.sin(ph) * Math.sin(t), z: r * Math.cos(ph), r: 0.1, g: 0.1, b: 0.2, s: 0.4 };
+                    } else p = { x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 };
+                }
+                else if (tech === 'red') p = getRed(i);
+                else if (tech === 'void') p = getVoid(i);
+                else if (tech === 'purple') p = getPurple(i);
+                else if (tech === 'shrine') p = getShrine(i);
+                else if (tech === 'chidori') p = getChidori(i);
+                else if (tech === 'fireball') p = getFireball(i);
+                else if (tech === 'charging_room') p = getRoomCharging(i, window.roomProgress || 0);
+                else if (tech === 'room') p = getRoom(i);
+
+                targetPositions[i * 3] = p.x; targetPositions[i * 3 + 1] = p.y; targetPositions[i * 3 + 2] = p.z;
+                targetColors[i * 3] = p.r; targetColors[i * 3 + 1] = p.g; targetColors[i * 3 + 2] = p.b;
+                targetSizes[i] = p.s;
+            }
+        }
+
+        const cameraUtils = new Camera(videoElement, {
+            onFrame: async () => {
+                canvasElement.width = videoElement.videoWidth;
+                canvasElement.height = videoElement.videoHeight;
+                await hands.send({ image: videoElement });
+            }, width: 640, height: 480
+        });
+        cameraUtils.start();
+
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (shakeIntensity > 0) {
+                renderer.domElement.style.transform = `translate(${(Math.random() - 0.5) * shakeIntensity * 40}px, ${(Math.random() - 0.5) * shakeIntensity * 40}px)`;
+            } else {
+                renderer.domElement.style.transform = 'translate(0,0)';
+            }
+
+            const pos = particles.geometry.attributes.position.array;
+            const col = particles.geometry.attributes.color.array;
+            const siz = particles.geometry.attributes.size.array;
+
+            for (let i = 0; i < COUNT * 3; i++) {
+                pos[i] += (targetPositions[i] - pos[i]) * 0.1;
+                col[i] += (targetColors[i] - col[i]) * 0.1;
+            }
+            for (let i = 0; i < COUNT; i++) siz[i] += (targetSizes[i] - siz[i]) * 0.1;
+
+            particles.geometry.attributes.position.needsUpdate = true;
+            particles.geometry.attributes.color.needsUpdate = true;
+            particles.geometry.attributes.size.needsUpdate = true;
+
+            // SMOOTH HAND ROTATION
+            smoothedRotation.x += (targetRotation.x - smoothedRotation.x) * 0.1;
+            smoothedRotation.y += (targetRotation.y - smoothedRotation.y) * 0.1;
+
+            // Apply Hand Rotation Base
+            particles.rotation.x = smoothedRotation.x;
+            particles.rotation.y = smoothedRotation.y;
+
+            // UPDATED ROTATION LOGIC
+            // Room and charging should probably have stable rotation or slow spin
+            if (currentTech === 'room' || currentTech === 'charging_room') {
+                particles.rotation.z += 0.002; // Very slow drift
+            }
+            else if (currentTech === 'red') {
+                particles.rotation.z -= 0.1;
+            } else if (currentTech === 'purple') {
+                particles.rotation.z += 0.2;
+                particles.rotation.y += 0.05;
+            } else if (currentTech === 'shrine') {
+                particles.rotation.z = 0;
+            } else if (currentTech === 'chidori') {
+                particles.rotation.z += 0.5;
+            } else if (currentTech === 'fireball') {
+                particles.rotation.z = 0;
+            } else {
+                // Neutral
+            }
+
+            composer.render();
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+
+</html>
